@@ -1,8 +1,10 @@
+from utils.compiler import encrypt, decrypt
 from dotenv import dotenv_values
+from datetime import datetime
 from telegram.ext import *
 
 HELP = """Dear NAME,
-wellcome to winger bot. You can see all the commands below
+welcome to winger bot. You can see all the commands below
 
 Commands:
     /help       display the help message
@@ -10,9 +12,13 @@ Commands:
     /file       encrypt file
 """
 
+def consoleLog(update):
+    print(f"{datetime.now()}: {update.message.chat} -> {update.message.text}")
+
 def start_command(update, context):
     first_name = update.message.chat["first_name"]
     update.message.reply_text(HELP.replace("NAME", first_name))
+    consoleLog(update)
 
 
 if __name__ == "__main__":
