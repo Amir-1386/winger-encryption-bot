@@ -85,7 +85,7 @@ def decode(string, key):
 ####################### encrypt.py #######################
 def encrypt_cypher(string):
 
-    with open(tar_archive_filename, "w") as file:
+    with open(tar_archive_filename, "w", encoding="utf-8") as file:
         file.write(string)
 
     with tarfile.open("encrypted.tar.gz", "w:gz") as file:

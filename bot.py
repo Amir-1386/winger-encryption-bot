@@ -3,92 +3,107 @@ from dotenv import dotenv_values
 from datetime import datetime
 from telegram.ext import *
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+import os
 
-HELP = """Dear NAME,
+START = """Dear NAME,
 welcome to winger bot. You can see all the commands below
 
 Commands:
     /help       display the help message
     /text       Encrypt/Decrypt text
-    /file       Encrypt/Decrypt file
+"""
+
+HELP = """
+Commands:
+    /help       display the help message
+    /text       Encrypt/Decrypt text
 """
 
 ERROR = "Command or text is not define, enter the /help command to see more " \
         "details."
 
-TEXT_ENCRYPTION = {"status": False, "method": None}
-FILE_ENCRYPTION = {"status": False, "method": None}
+TEXT_ENCRYPTION = {}
 
-def consoleLog(update):
-    print(f"{datetime.now()}: {update.message.chat} -> {update.message.text}")
+def consoleLog(update, content):
+    print(f"{datetime.now()}: {update.message.chat} -> {content}")
 
 def start_command(update, context):
+    global TEXT_ENCRYPTION
+    
+    TEXT_ENCRYPTION[update.message.chat["id"]] = {"status": False, "method": None}
+    
     chat_id = update.effective_chat.id
     first_name = update.message.chat["first_name"]
-    update.message.reply_text(HELP.replace("NAME", first_name))
-    consoleLog(update)
+    update.message.reply_text(START.replace("NAME", first_name))
+    
+    consoleLog(update, update.message.text)
+
+def help_command(update, context):
+    global TEXT_ENCRYPTION
+    
+    TEXT_ENCRYPTION[update.message.chat["id"]] = {"status": False, "method": None}
+    
+    chat_id = update.effective_chat.id
+    first_name = update.message.chat["first_name"]
+    update.message.reply_text(HELP)
+    
+    consoleLog(update, update.message.text)
 
 def text_command(update, text):
-    global TEXT_ENCRYPTION, FILE_ENCRYPTION
+    global TEXT_ENCRYPTION
 
     try:
-        answer = eval(f"{TEXT_ENCRYPTION['method']}_text(text)")
+        if TEXT_ENCRYPTION[update.message.chat['id']]['method'] == 'encrypt':
+            answer = encrypt_text(text)
+        elif TEXT_ENCRYPTION[update.message.chat['id']]['method'] == 'decrypt':
+            answer = decrypt_text(text)
+    except:
+        update.message.reply_text(f"Can not {TEXT_ENCRYPTION[update.message.chat['id']]['method']} {text}")
+    else:
         update.message.reply_text(answer)
 
-    except base64.binascii.Error:
-        update.message.reply_text(f"Can not decrypt {text}")
-
-    TEXT_ENCRYPTION["status"] = False
-    TEXT_ENCRYPTION["method"] = None
+    TEXT_ENCRYPTION[update.message.chat["id"]] = {"status": False, "method": None}
 
 def toggle_choose_action_for_text(update, context):
     # reset the values
     global TEXT_ENCRYPTION
-    TEXT_ENCRYPTION["status"] = True
-    TEXT_ENCRYPTION["method"] = None
+    TEXT_ENCRYPTION[update.message.chat["id"]] = {"status": True, "method": None}
 
-    reply_markup = ReplyKeyboardMarkup([["Encrypt", "Decrypt"]])
+    reply_markup = ReplyKeyboardMarkup([["/encrypt", "/decrypt"]])
     update.message.reply_text("Choose the action", reply_markup=reply_markup)
-    consoleLog(update)
 
-def toggle_choose_action_for_file(update, context):
-    # reset the values
-    global FILE_ENCRYPTION
-    FILE_ENCRYPTION["status"] = True
-    FILE_ENCRYPTION["method"] = None
+    consoleLog(update, update.message.text)
 
-    reply_markup = ReplyKeyboardMarkup([["Encrypt", "Decrypt"]])
-    update.message.reply_text("Choose the action", reply_markup=reply_markup)
-    consoleLog(update)
-
-def handle_message(update, context):
-    text = update.message.text
-
-    if text in ("Encrypt", "Decrypt"):
-        if TEXT_ENCRYPTION["status"]:
-            TEXT_ENCRYPTION["method"] = text.lower()
-            update.message.reply_text("Enter the text that you want to " + \
-            text.lower(), reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
-
-        elif FILE_ENCRYPTION["status"]:
-            FILE_ENCRYPTION["method"] = text.lower()
-            update.message.reply_text("Enter the file that you want to " + \
-            text.lower(), reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
-
-        else:
-            update.message.reply_text(ERROR)
-
-    elif TEXT_ENCRYPTION["status"] and TEXT_ENCRYPTION["method"]:
-        text_command(update, text)
-
-    elif FILE_ENCRYPTION["status"] and FILE_ENCRYPTION["method"]:
-        # TODO: complete this part and finish the program
-        pass
+def encrypt_mode(update, context):
+    if TEXT_ENCRYPTION[update.message.chat["id"]]["status"]:
+        TEXT_ENCRYPTION[update.message.chat["id"]]["method"] = "encrypt"
+        update.message.reply_text("Enter the text that you want to " + \
+        "encrypt", reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
 
     else:
         update.message.reply_text(ERROR)
 
-    consoleLog(update)
+def decrypt_mode(update, context):
+    if TEXT_ENCRYPTION[update.message.chat["id"]]["status"]:
+        TEXT_ENCRYPTION[update.message.chat["id"]]["method"] = "decrypt"
+        update.message.reply_text("Enter the text that you want to " + \
+        "decrypt", reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
+
+    else:
+        update.message.reply_text(ERROR)
+
+def handle_message_text(update, context):
+    
+    if TEXT_ENCRYPTION[update.message.chat["id"]]["status"] and TEXT_ENCRYPTION[update.message.chat["id"]]["method"]:
+        text = update.message.text
+        
+        text_command(update, text)
+        help_command(update, context)
+    
+    else:
+        update.message.reply_text(ERROR)
+
+    consoleLog(update, update.message.text)
 
 
 if __name__ == "__main__":
@@ -105,9 +120,11 @@ if __name__ == "__main__":
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start_command))
-    dp.add_handler(CommandHandler("help", start_command))
+    dp.add_handler(CommandHandler("help", help_command))
     dp.add_handler(CommandHandler("text", toggle_choose_action_for_text))
-    dp.add_handler(MessageHandler(Filters.text, handle_message))
+    dp.add_handler(CommandHandler("encrypt", encrypt_mode))
+    dp.add_handler(CommandHandler("decrypt", decrypt_mode))
+    dp.add_handler(MessageHandler(Filters.text, handle_message_text))
 
     print("bot is running...")
     updater.start_polling()
